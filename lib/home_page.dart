@@ -9,17 +9,16 @@ import 'package:task_manager_app/storage_service.dart';
 import 'package:task_manager_app/create_task_page.dart';
 import 'package:task_manager_app/task_details_page.dart';
 import 'package:task_manager_app/group_details_page.dart';
-// import 'package:task_manager_app/widgets/delegation_chain_widget.dart';
+// Nu mai avem nevoie de widgets/delegation_chain_widget.dart aici
 
 //############################################################################
 // PASUL 1: DEFINIM TOATE WIDGET-URILE "ECRAN"
 //############################################################################
 
 // --- ECRANUL 1: ACASĂ (SARCINI) ---
-// --- ECRANUL 1: ACASĂ (SARCINI) ---
 class _TasksScreen extends StatefulWidget {
   final ApiClient apiClient;
-  final String currentUsername; // Necesar pentru DelegationChainWidget
+  final String currentUsername;
 
   const _TasksScreen({
     super.key,
@@ -35,7 +34,6 @@ class _TasksScreenState extends State<_TasksScreen> {
   late Future<List<dynamic>> _tasksFuture;
   String _selectedFilter = 'all';
 
-  // O listă pentru a ține evidența sarcinilor care se încarcă
   final Set<String> _loadingTaskIds = {};
 
   @override
@@ -59,7 +57,6 @@ class _TasksScreenState extends State<_TasksScreen> {
     }
   }
 
-  // Funcție publică pentru reîmprospătare, apelată de HomePage
   void refreshTasks() {
     setState(() {
       _tasksFuture = _fetchTasks();
@@ -132,7 +129,7 @@ class _TasksScreenState extends State<_TasksScreen> {
           padding: const EdgeInsets.all(16.0),
           child: Text(
             'Sarcinile Mele',
-            style: GoogleFonts.robotoSlab(
+            style: GoogleFonts.oswald(
               color: Colors.white,
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -376,10 +373,7 @@ class _GroupsScreenState extends State<_GroupsScreen> {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
-          title: Text(
-            'Grup Nou',
-            style: GoogleFonts.robotoSlab(color: Colors.red),
-          ),
+          title: Text('Grup Nou', style: GoogleFonts.oswald(color: Colors.red)),
           content: TextField(
             controller: _newGroupNameController,
             style: const TextStyle(color: Colors.white),
@@ -591,8 +585,8 @@ class _VisualizationsScreenState extends State<_VisualizationsScreen> {
         children: [
           TabBar(
             indicatorColor: Colors.red,
-            labelStyle: GoogleFonts.robotoSlab(fontWeight: FontWeight.bold),
-            unselectedLabelStyle: GoogleFonts.robotoSlab(),
+            labelStyle: GoogleFonts.oswald(fontWeight: FontWeight.bold),
+            unselectedLabelStyle: GoogleFonts.oswald(),
             labelColor: Colors.red,
             unselectedLabelColor: Colors.grey,
             tabs: const [
@@ -761,7 +755,7 @@ class _ProfileScreenState extends State<_ProfileScreen> {
         children: [
           Text(
             'Setări și Securitate',
-            style: GoogleFonts.robotoSlab(
+            style: GoogleFonts.oswald(
               color: Colors.white,
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -773,8 +767,8 @@ class _ProfileScreenState extends State<_ProfileScreen> {
           const Divider(color: Colors.red),
           const SizedBox(height: 24),
           Text(
-            'Log-uri de Activitate',
-            style: GoogleFonts.robotoSlab(color: Colors.red, fontSize: 18),
+            'Jurnal de Activitate',
+            style: GoogleFonts.oswald(color: Colors.red, fontSize: 18),
           ),
           const SizedBox(height: 8),
           FutureBuilder<List<dynamic>>(
@@ -865,7 +859,7 @@ Widget _buildKanbanColumn(String title, List<Widget> cards) {
       children: [
         Text(
           title,
-          style: GoogleFonts.robotoSlab(
+          style: GoogleFonts.oswald(
             color: Colors.red,
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -927,8 +921,6 @@ class _HomePageState extends State<HomePage> {
   late final List<Widget> _pages;
   late final String _currentUsername; // Stocăm username-ul aici
 
-  // În clasa _HomePageState
-
   @override
   void initState() {
     super.initState();
@@ -973,6 +965,66 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // NOU: Funcția care arată meniul de opțiuni (corecția cerută)
+  void _showCreateMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          color: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Ce dorești să creezi?',
+                style: GoogleFonts.oswald(color: Colors.white, fontSize: 18),
+              ),
+              const Divider(color: Colors.grey),
+              ListTile(
+                leading: const Icon(Icons.note_add, color: Colors.red),
+                title: const Text('Sarcină Principală (Nivel Înalt)'),
+                onTap: () {
+                  Navigator.pop(context); // Închide meniul
+                  _navigateToCreateTask();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.call_split, color: Colors.orange),
+                title: const Text('Sub-sarcină (Atașată unui Părinte)'),
+                onTap: () {
+                  Navigator.pop(context);
+                  // Educăm utilizatorul despre logica API-ului
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Creează sub-sarcina din ecranul de detalii al sarcinii părinte.',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // NOU: Am mutat logica de navigare aici
+  void _navigateToCreateTask() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CreateTaskPage()),
+    );
+
+    if (result == true && mounted) {
+      _tasksScreenKey.currentState?.refreshTasks();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -991,10 +1043,6 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.group_work),
             label: 'Grupuri',
           ),
-          // BottomNavigationBarItem(
-          //   icon: Icon(Icons.bar_chart),
-          //   label: 'Vizualizări',
-          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.security_outlined),
             label: 'Profil',
@@ -1009,23 +1057,7 @@ class _HomePageState extends State<HomePage> {
           _selectedIndex ==
               0 // Doar pe tab-ul Acasă
           ? FloatingActionButton(
-              onPressed: () async {
-                // Facem funcția async
-                // Aici are loc navigarea la Creare Sarcină
-                final result = await Navigator.push(
-                  // Așteptăm un rezultat
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CreateTaskPage(),
-                  ),
-                );
-
-                // Dacă ne întoarcem cu succes (din CreateTaskPage)
-                if (result == true && mounted) {
-                  // Apelăm funcția de refresh din _TasksScreen
-                  _tasksScreenKey.currentState?.refreshTasks();
-                }
-              },
+              onPressed: () => _showCreateMenu(context), // NOU: Apelăm meniul
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
               child: const Icon(Icons.add_task),
@@ -1049,7 +1081,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             Text(
               'ADMINISTRATOR DOSARE',
-              style: GoogleFonts.robotoSlab(
+              style: GoogleFonts.oswald(
                 color: const Color.fromARGB(255, 255, 0, 0),
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,
@@ -1058,7 +1090,7 @@ class _HomePageState extends State<HomePage> {
             ),
             Text(
               'STRICT SECRET',
-              style: GoogleFonts.robotoSlab(
+              style: GoogleFonts.oswald(
                 color: const Color.fromARGB(255, 255, 0, 0),
                 fontWeight: FontWeight.normal,
                 letterSpacing: 2,

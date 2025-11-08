@@ -275,13 +275,23 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                     ),
                     dropdownColor: Colors.grey[800],
                     style: const TextStyle(color: Colors.white),
-                    items: members.map((member) {
-                      final user = member['user'];
-                      return DropdownMenuItem<String>(
-                        value: user['id'] as String,
-                        child: Text(user['name'] as String),
-                      );
-                    }).toList(),
+                    items: members
+                        .map((member) {
+                          // Verificare de siguranță pe structura plată
+                          if (member['id'] == null || member['name'] == null) {
+                            return null;
+                          }
+
+                          final userId = member['id'] as String;
+                          final userName = member['name'] as String;
+
+                          return DropdownMenuItem<String>(
+                            value: userId,
+                            child: Text(userName),
+                          );
+                        })
+                        .whereType<DropdownMenuItem<String>>()
+                        .toList(), // Filtrăm null-urile
                     onChanged: (value) {
                       setStateInDialog(() {
                         _selectedSubtaskAssigneeId = value;
@@ -299,13 +309,15 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    // Verificăm dacă datele sunt complete
-                    if (_subtaskTitleController.text.isNotEmpty &&
-                        _selectedSubtaskAssigneeId != null) {
-                      Navigator.of(dialogContext).pop(true); // Returnează true
-                    }
-                  },
+                  // NOU: Aici este corecția
+                  onPressed:
+                      _subtaskTitleController.text.isNotEmpty &&
+                          _selectedSubtaskAssigneeId != null
+                      ? () {
+                          // Dacă e valid, returnăm true și închidem
+                          Navigator.of(dialogContext).pop(true);
+                        }
+                      : null, // Dezactivăm butonul dacă datele lipsesc
                   child: const Text("Salvează"),
                 ),
               ],
