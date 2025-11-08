@@ -15,8 +15,7 @@ class AuthInterceptor implements InterceptorContract {
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
-      // Setează JSON by default (nu afectează MultipartRequest)
-      request.headers.putIfAbsent('Content-Type', () => 'application/json');
+      request.headers['Content-Type'] = 'application/json';
     } catch (_) {}
     return request;
   }
@@ -25,7 +24,6 @@ class AuthInterceptor implements InterceptorContract {
   Future<BaseResponse> interceptResponse({
     required BaseResponse response,
   }) async {
-    // Nicio modificare specială aici; RetryPolicy se ocupă de 401
     return response;
   }
 
@@ -40,7 +38,6 @@ class AuthInterceptor implements InterceptorContract {
 class ExpiredTokenRetryPolicy extends RetryPolicy {
   final StorageService _storage = StorageService();
 
-  // Câte încercări maxime pe aceeași cerere (1 retry după refresh)
   @override
   int get maxRetryAttempts => 1;
 
@@ -49,7 +46,12 @@ class ExpiredTokenRetryPolicy extends RetryPolicy {
     if (response.statusCode == 401) {
       try {
         final refreshToken = await _storage.getRefreshToken();
-        if (refreshToken == null || refreshToken.isEmpty) return false;
+        final currentUsername = await _storage.getUsername();
+
+        if (refreshToken == null ||
+            refreshToken.isEmpty ||
+            currentUsername == null)
+          return false;
 
         final refreshResp = await http.post(
           Uri.parse('${ApiConfig.baseUrl}/auth/refresh'),
@@ -62,16 +64,14 @@ class ExpiredTokenRetryPolicy extends RetryPolicy {
           final access = m['accessToken'] as String?;
           final refresh = m['refreshToken'] as String?;
           if (access != null && refresh != null) {
-            await _storage.saveTokens(access, refresh);
-            // La retry, AuthInterceptor va citi noul access token și îl va adăuga pe cererea reluată.
+            await _storage.saveAuthData(access, refresh, currentUsername);
             return true;
           }
         } else {
-          // Refresh eșuat: curățăm token-urile
-          await _storage.clearTokens();
+          await _storage.clearAuthData();
         }
       } catch (_) {
-        await _storage.clearTokens();
+        await _storage.clearAuthData();
       }
     }
     return false;
@@ -88,9 +88,23 @@ class ApiClient {
         retryPolicy: ExpiredTokenRetryPolicy(),
       );
 
-  Future<http.Response> get(String path) {
-    return client.get(Uri.parse('${ApiConfig.baseUrl}$path'));
+  // --- AICI ESTE MODIFICAREA ---
+  Future<http.Response> get(
+    String path, [
+    Map<String, dynamic>? queryParameters,
+  ]) {
+    // Construim Uri-ul de bază
+    var uri = Uri.parse('${ApiConfig.baseUrl}$path');
+
+    // Adăugăm query parameters dacă există
+    // Funcția .replace() se ocupă automat de URL encoding (ex: spațiu devine %20)
+    if (queryParameters != null) {
+      uri = uri.replace(queryParameters: queryParameters);
+    }
+
+    return client.get(uri);
   }
+  // --- FINALUL MODIFICĂRII ---
 
   Future<http.Response> post(String path, dynamic body) {
     return client.post(

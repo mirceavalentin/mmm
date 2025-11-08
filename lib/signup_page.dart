@@ -60,23 +60,22 @@ class _SignupPageState extends State<SignupPage> {
         final String refreshToken = data['refreshToken'];
         final String username = data['user']['name'];
 
-        // NOU: Salvăm token-urile
-        await _storageService.saveTokens(accessToken, refreshToken);
+        // NOU: Folosim funcția actualizată
+        await _storageService.saveAuthData(accessToken, refreshToken, username);
 
         if (mounted) {
-          // Navigăm direct la HomePage
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => HomePage(username: username),
             ),
           );
+        } else {
+          final errorData = jsonDecode(response.body);
+          final errorMessage =
+              errorData['error']['message'] ?? 'A apărut o eroare';
+          _showError(errorMessage);
         }
-      } else {
-        final errorData = jsonDecode(response.body);
-        final errorMessage =
-            errorData['error']['message'] ?? 'A apărut o eroare';
-        _showError(errorMessage);
       }
     } catch (e) {
       _showError('Eroare de rețea: ${e.toString()}');

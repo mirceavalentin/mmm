@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:task_manager_app/home_page.dart';
 import 'package:task_manager_app/login_page.dart';
 import 'package:task_manager_app/storage_service.dart';
-import 'package:task_manager_app/api_config.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:task_manager_app/api_client.dart'; // Importăm noul client
 
 void main() {
   runApp(const MyApp());
@@ -28,12 +26,12 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: _AppInitializer(), // NOU: Folosim un "splash screen" logic
+      home: _AppInitializer(), // Folosim "splash screen-ul" logic
     );
   }
 }
 
-// NOU: Un widget care decide unde să trimită utilizatorul la pornire
+// Widget-ul care decide unde să trimită utilizatorul la pornire
 class _AppInitializer extends StatefulWidget {
   @override
   _AppInitializerState createState() => _AppInitializerState();
@@ -49,43 +47,34 @@ class _AppInitializerState extends State<_AppInitializer> {
   }
 
   Future<void> _checkLoginStatus() async {
+    // Verificăm dacă avem token-uri ȘI username
     final refreshToken = await _storageService.getRefreshToken();
-    if (refreshToken == null) {
+    final username = await _storageService.getUsername();
+
+    if (refreshToken == null || username == null) {
       // Nu e logat, mergem la Login
       _navigateTo(const LoginPage());
       return;
     }
 
-    // Avem un refresh token, încercăm să reînnoim
+    // Avem token-uri. Încercăm un apel API real ca să testăm token-ul.
+    // ApiClient (cu RetryPolicy) va face refresh automat dacă e nevoie.
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refreshToken': refreshToken}),
-      );
+      final apiClient = ApiClient();
+      final response = await apiClient.get('/logs'); // Un apel "ușor"
 
       if (response.statusCode == 200) {
-        // Reînnoire cu succes!
-        final data = jsonDecode(response.body);
-        final String accessToken = data['accessToken'];
-        final String newRefreshToken =
-            data['refreshToken']; // Serverul poate reîmprospăta și refresh token-ul
-
-        // Salvăm noile token-uri
-        await _storageService.saveTokens(accessToken, newRefreshToken);
-
-        // Aici avem o problemă: nu avem `username`.
-        // Trebuie să-l fi salvat și pe el, sau să facem un apel la /auth/me
-        // Pentru simplitate, deocamdată trimitem un "User" placeholder
-        // Ideal, /auth/refresh ar returna și obiectul 'user'
-        _navigateTo(const HomePage(username: 'Agent'));
+        // Token-ul e valid (sau a fost reînnoit), mergem direct la HomePage
+        _navigateTo(HomePage(username: username));
       } else {
-        // Refresh token-ul e invalid
-        await _storageService.clearTokens();
+        // Ceva a eșuat (ex: refresh-ul a dat eroare 403, serverul a picat)
+        await _storageService.clearAuthData();
         _navigateTo(const LoginPage());
       }
     } catch (e) {
       // Fără rețea, etc.
+      print("Eroare la pornire: $e");
+      // Mergem la login, deși am putea merge la home în mod "offline"
       _navigateTo(const LoginPage());
     }
   }
